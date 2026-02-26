@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Text;
 using LibCpp2IL.BinaryStructures;
 using LibCpp2IL.Metadata;
@@ -8,31 +8,13 @@ namespace LibCpp2IL;
 
 public class Cpp2IlMethodRef(Il2CppMethodSpec methodSpec)
 {
+    public Il2CppMethodSpec MethodSpec => methodSpec;
     public Il2CppTypeDefinition DeclaringType => BaseMethod.DeclaringType!;
     public Il2CppTypeReflectionData[] TypeGenericParams => methodSpec.GenericClassParams;
     public Il2CppMethodDefinition BaseMethod => methodSpec.MethodDefinition!;
     public Il2CppTypeReflectionData[] MethodGenericParams => methodSpec.GenericMethodParams;
 
     public ulong GenericVariantPtr;
-
-    // var declaringTypeGenericParams = Array.Empty<Il2CppTypeReflectionData>();
-    // if (methodSpec.classIndexIndex != -1)
-    // {
-    //     var classInst = methodSpec.GenericClassInst;
-    //     declaringTypeGenericParams = LibCpp2ILUtils.GetGenericTypeParams(classInst!)!;
-    // }
-    //
-    // var genericMethodParameters = Array.Empty<Il2CppTypeReflectionData>();
-    // if (methodSpec.methodIndexIndex != -1)
-    // {
-    //     var methodInst = methodSpec.GenericMethodInst;
-    //     genericMethodParameters = LibCpp2ILUtils.GetGenericTypeParams(methodInst!)!;
-    // }
-    //
-    // BaseMethod = methodSpec.MethodDefinition!;
-    // DeclaringType = methodSpec.MethodDefinition!.DeclaringType!;
-    // TypeGenericParams = declaringTypeGenericParams;
-    // MethodGenericParams = genericMethodParameters;
 
     public override string ToString()
     {
