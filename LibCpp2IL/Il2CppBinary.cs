@@ -27,20 +27,20 @@ public abstract class Il2CppBinary(MemoryStream input) : ClassReadingBinaryReade
     private long _maxMetadataUsages = 0;
 
     private Il2CppMetadataRegistration _metadataRegistration = null!;
-    private Il2CppCodeRegistration _codeRegistration = null!;
+    public Il2CppCodeRegistration _codeRegistration = null!;
 
-    private ulong[] _methodPointers = [];
+    public ulong[] _methodPointers = [];
 
-    private ulong[] _genericMethodPointers = [];
+    public ulong[] _genericMethodPointers = [];
 
-    // private ulong[] _invokerPointers = Array.Empty<ulong>();
+    public ulong[] _invokerPointers = [];
     private ulong[]? _customAttributeGenerators = []; //Pre-27 only
     private long[] _fieldOffsets = [];
     private ulong[] _metadataUsages = []; //Pre-27 only
     private ulong[][] _codeGenModuleMethodPointers = []; //24.2+
 
     private Il2CppType[] _types = [];
-    private Il2CppGenericMethodFunctionsDefinitions[] _genericMethodTables = [];
+    public Il2CppGenericMethodFunctionsDefinitions[] _genericMethodTables = [];
     private Il2CppGenericInst[] _genericInsts = [];
     private Il2CppMethodSpec[] _methodSpecs = [];
     private Il2CppCodeGenModule[] _codeGenModules = []; //24.2+
@@ -56,6 +56,7 @@ public abstract class Il2CppBinary(MemoryStream input) : ClassReadingBinaryReade
     public int PointerSizeBytes => is32Bit ? 4 : 8;
 
     public int NumTypes => _types.Length;
+    public int CodeGenModulesCount => _codeGenModules.Length;
 
     public Il2CppType[] AllTypes => _types;
 
@@ -142,11 +143,10 @@ public abstract class Il2CppBinary(MemoryStream input) : ClassReadingBinaryReade
 
         InBinaryMetadataSize += GetNumBytesReadSinceLastCallAndClear();
 
-        // These aren't actually used right now, and if we have a limited code reg (e.g. heavily inlined linux games) we can't read them anyway
-        // LibLogger.Verbose("\tReading invoker pointers...");
-        // start = DateTime.Now;
-        // _invokerPointers = ReadNUintArrayAtVirtualAddress(_codeRegistration.invokerPointers, (long)_codeRegistration.invokerPointersCount);
-        // LibLogger.VerboseNewline($"OK ({(DateTime.Now - start).TotalMilliseconds} ms)");
+        LibLogger.Verbose("\tReading invoker pointers...");
+        start = DateTime.Now;
+        _invokerPointers = ReadNUintArrayAtVirtualAddress(_codeRegistration.invokerPointers, (long)_codeRegistration.invokerPointersCount);
+        LibLogger.VerboseNewline($"OK ({(DateTime.Now - start).TotalMilliseconds} ms)");
 
         InBinaryMetadataSize += GetNumBytesReadSinceLastCallAndClear();
 
