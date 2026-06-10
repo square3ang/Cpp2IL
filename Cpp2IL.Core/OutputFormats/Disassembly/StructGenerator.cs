@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Cpp2IL.Core.Model.Contexts;
 using Cpp2IL.Core.Utils;
 using LibCpp2IL;
 using LibCpp2IL.BinaryStructures;
@@ -16,8 +17,16 @@ namespace Il2CppDumper
 {
     public class StructGenerator
     {
-        private Il2CppMetadata metadata => LibCpp2IlMain.TheMetadata;
-        private Il2CppBinary il2Cpp => LibCpp2IlMain.Binary;
+        private readonly Il2CppMetadata metadata;
+        private readonly Il2CppBinary il2Cpp;
+        private readonly float metadataVersion;
+
+        public StructGenerator(ApplicationAnalysisContext context)
+        {
+            metadata = context.Metadata;
+            il2Cpp = context.Binary;
+            metadataVersion = context.MetadataVersion;
+        }
         private readonly Dictionary<Il2CppTypeDefinition, string> typeDefImageNames = new();
         private readonly HashSet<string> structNameHashSet = new(StringComparer.Ordinal);
         private readonly List<StructInfo> structInfoList = new();
@@ -115,7 +124,7 @@ namespace Il2CppDumper
                                 methodTypeSignature.Add(il2Cpp.GetType(typeDef.ByvalTypeIndex).Type);
                                 parameterStrs.Add($"{thisType} __this");
                             }
-                            else if (LibCpp2IlMain.MetadataVersion <= 24)
+                            else if (metadataVersion <= 24)
                             {
                                 methodTypeSignature.Add(Il2CppTypeEnum.IL2CPP_TYPE_PTR);
                                 parameterStrs.Add($"Il2CppObject* __this");
@@ -200,7 +209,7 @@ namespace Il2CppDumper
                                         }
                                         parameterStrs.Add($"{thisType} __this");
                                     }
-                                    else if (LibCpp2IlMain.MetadataVersion <= 24)
+                                    else if (metadataVersion <= 24)
                                     {
                                         methodTypeSignature.Add(Il2CppTypeEnum.IL2CPP_TYPE_PTR);
                                         parameterStrs.Add($"Il2CppObject* __this");
@@ -231,7 +240,7 @@ namespace Il2CppDumper
             }
             //Handling function range
             List<ulong> orderedPointers;
-            if (LibCpp2IlMain.MetadataVersion >= 24.2)
+            if (metadataVersion >= 24.2)
             {
                 orderedPointers = new List<ulong>();
                 for (var i = 0; i < il2Cpp.CodeGenModulesCount; i++)
@@ -245,11 +254,11 @@ namespace Il2CppDumper
             }
             orderedPointers.AddRange(il2Cpp._genericMethodPointers);
             orderedPointers.AddRange(il2Cpp._invokerPointers);
-            if (LibCpp2IlMain.MetadataVersion < 29)
+            if (metadataVersion < 29)
             {
                 orderedPointers.AddRange(il2Cpp.AllCustomAttributeGenerators);
             }
-            if (LibCpp2IlMain.MetadataVersion >= 22)
+            if (metadataVersion >= 22)
             {
                 if (il2Cpp._codeRegistration.reversePInvokeWrappers != 0)
                 {
@@ -272,7 +281,7 @@ namespace Il2CppDumper
                 json.Addresses[i] = il2Cpp.GetRva(orderedPointers[i]);
             }
             // Processing MetadataUsage
-            //if (LibCpp2IlMain.MetadataVersion >= 27)
+            //if (metadataVersion >= 27)
             if (false)
             {
                 //var sectionHelper = GetSectionHelper();
@@ -349,7 +358,7 @@ namespace Il2CppDumper
                     }
                 }
             }
-            else if (LibCpp2IlMain.MetadataVersion > 16 && LibCpp2IlMain.MetadataVersion < 27)
+            else if (metadataVersion > 16 && metadataVersion < 27)
             {
                 foreach (var i in metadata.metadataUsageDic![(uint)MetadataUsageType.TypeInfo])
                 {
@@ -399,7 +408,7 @@ namespace Il2CppDumper
             }
             var sb = new StringBuilder();
             sb.Append(HeaderConstants.GenericHeader);
-            switch (LibCpp2IlMain.MetadataVersion)
+            switch (metadataVersion)
             {
                 case 22f:
                     sb.Append(HeaderConstants.HeaderV22);
@@ -422,14 +431,12 @@ namespace Il2CppDumper
                 case 27.2f:
                     sb.Append(HeaderConstants.HeaderV27);
                     break;
-                case 29f:
-                case 29.1f:
-                case 31f:
+                case >= 29f:
                     sb.Append(HeaderConstants.HeaderV29);
                     break;
                 default:
                     sb.Append(HeaderConstants.HeaderV29);
-                    Console.WriteLine($"WARNING: This il2cpp version [{LibCpp2IlMain.MetadataVersion}] does not support generating .h files");
+                    Console.WriteLine($"WARNING: This il2cpp version [{metadataVersion}] does not support generating .h files");
                     break;
                     //return;
             }
@@ -992,9 +999,9 @@ namespace Il2CppDumper
             }
             else
             {
-                if (LibCpp2IlMain.Binary is PE && !info.IsValueType)
+                if (il2Cpp is PE && !info.IsValueType)
                 {
-                    if (LibCpp2IlMain.Binary.is32Bit)
+                    if (il2Cpp.is32Bit)
                     {
                         sb.Append($"struct __declspec(align(4)) {info.TypeName}_Fields {{\n");
                     }
@@ -1542,7 +1549,7 @@ namespace Il2CppDumper
 
             methodInfoHeader.Append($"struct {methodInfoName} {{\n");
             methodInfoHeader.Append($"\tIl2CppMethodPointer methodPointer;\n");
-            if (LibCpp2IlMain.MetadataVersion >= 29)
+            if (metadataVersion >= 29)
             {
                 methodInfoHeader.Append($"\tIl2CppMethodPointer virtualMethodPointer;\n");
                 methodInfoHeader.Append($"\tInvokerMethod invoker_method;\n");
@@ -1552,7 +1559,7 @@ namespace Il2CppDumper
                 methodInfoHeader.Append($"\tvoid* invoker_method;\n"); //TODO
             }
             methodInfoHeader.Append($"\tconst char* name;\n");
-            if (LibCpp2IlMain.MetadataVersion <= 24)
+            if (metadataVersion <= 24)
             {
                 methodInfoHeader.Append($"\t{structTypeName}_c *declaring_type;\n");
             }
@@ -1561,7 +1568,7 @@ namespace Il2CppDumper
                 methodInfoHeader.Append($"\t{structTypeName}_c *klass;\n");
             }
             methodInfoHeader.Append($"\tconst Il2CppType *return_type;\n");
-            if (LibCpp2IlMain.MetadataVersion >= 29)
+            if (metadataVersion >= 29)
             {
                 methodInfoHeader.Append($"\tconst Il2CppType** parameters;\n");
             }
@@ -1580,7 +1587,7 @@ namespace Il2CppDumper
             methodInfoHeader.Append($"\tunion\n");
             methodInfoHeader.Append($"\t{{\n");
             methodInfoHeader.Append($"\t\tconst void* genericMethod;\n");
-            if (LibCpp2IlMain.MetadataVersion >= 27)
+            if (metadataVersion >= 27)
             {
                 methodInfoHeader.Append($"\t\tconst void* genericContainerHandle;\n");
             }
@@ -1589,7 +1596,7 @@ namespace Il2CppDumper
                 methodInfoHeader.Append($"\t\tconst void* genericContainer;\n");
             }
             methodInfoHeader.Append($"\t}};\n");
-            if (LibCpp2IlMain.MetadataVersion <= 24)
+            if (metadataVersion <= 24)
             {
                 methodInfoHeader.Append($"\tint32_t customAttributeIndex;\n");
             }

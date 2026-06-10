@@ -10,6 +10,6 @@ public class DisassemblyOutputFormat : Cpp2IlOutputFormat
     public override string OutputFormatName => "Disassembly";
     public override void DoOutput(ApplicationAnalysisContext context, string outputRoot)
     {
-        new StructGenerator().WriteScript(outputRoot);
+        new StructGenerator(context).WriteScript(outputRoot);
     }
 }
