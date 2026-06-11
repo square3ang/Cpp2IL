@@ -20,12 +20,14 @@ namespace Il2CppDumper
         private readonly Il2CppMetadata metadata;
         private readonly Il2CppBinary il2Cpp;
         private readonly float metadataVersion;
+        private readonly LibCpp2IlContext libCpp2IlContext;
 
         public StructGenerator(ApplicationAnalysisContext context)
         {
             metadata = context.Metadata;
             il2Cpp = context.Binary;
             metadataVersion = context.MetadataVersion;
+            libCpp2IlContext = context.LibCpp2IlContext;
         }
         private readonly Dictionary<Il2CppTypeDefinition, string> typeDefImageNames = new();
         private readonly HashSet<string> structNameHashSet = new(StringComparer.Ordinal);
@@ -281,77 +283,50 @@ namespace Il2CppDumper
                 json.Addresses[i] = il2Cpp.GetRva(orderedPointers[i]);
             }
             // Processing MetadataUsage
-            //if (metadataVersion >= 27)
-            if (false)
+            if (metadataVersion >= 27)
             {
-                //var sectionHelper = GetSectionHelper();
-                //foreach (var sec in sectionHelper.Data)
+                var rawBinary = il2Cpp.GetRawBinaryContent();
+                var pointerSize = il2Cpp.PointerSizeBytes;
+                var len = rawBinary.Length;
+                for (int offset = 0; offset <= len - pointerSize; offset += pointerSize)
                 {
-                    //il2Cpp.Position = sec.offset;
-                    //var end = Math.Min(sec.offsetEnd, il2Cpp.Length) - il2Cpp.PointerSize;
-                    //while (il2Cpp.Position < end)
+                    ulong metadataValue;
+                    if (pointerSize == 8)
                     {
-                        var addr = il2Cpp.Position;
-                        var metadataValue = il2Cpp.ReadNUint();
-                        var position = il2Cpp.Position;
-                        if (metadataValue < uint.MaxValue)
+                        metadataValue = BitConverter.ToUInt64(rawBinary, offset);
+                    }
+                    else
+                    {
+                        metadataValue = BitConverter.ToUInt32(rawBinary, offset);
+                    }
+
+                    if (metadataValue > 0 && (metadataValue & 1) == 1)
+                    {
+                        if (il2Cpp.TryMapRawAddressToVirtual((uint)offset, out var va) && va > 0)
                         {
-                            var encodedToken = (uint)metadataValue;
-                            var usage = metadata.GetEncodedIndexType(encodedToken);
-                            if (usage > 0 && usage <= 6)
+                            var usage = MetadataUsage.DecodeMetadataUsage(metadataValue, va, libCpp2IlContext);
+                            if (usage != null && usage.IsValid)
                             {
-                                var decodedIndex = metadata.GetDecodedMethodIndex(encodedToken);
-                                if (metadataValue == ((usage << 29) | (decodedIndex << 1)) + 1)
+                                switch (usage.Type)
                                 {
-                                    var va = il2Cpp.MapRawAddressToVirtual((uint)addr);
-                                    if (va > 0)
-                                    {
-                                        switch ((MetadataUsageType)usage)
-                                        {
-                                            case 0:
-                                                break;
-                                            case MetadataUsageType.TypeInfo:
-                                                if (decodedIndex < il2Cpp.AllTypes.Length)
-                                                {
-                                                    AddMetadataUsageTypeInfo(json, decodedIndex, va);
-                                                }
-                                                break;
-                                            case MetadataUsageType.Type:
-                                                if (decodedIndex < il2Cpp.AllTypes.Length)
-                                                {
-                                                    AddMetadataUsageIl2CppType(json, decodedIndex, va);
-                                                }
-                                                break;
-                                            case MetadataUsageType.MethodDef:
-                                                if (decodedIndex < metadata.methodDefs.Length)
-                                                {
-                                                    AddMetadataUsageMethodDef(json, decodedIndex, va);
-                                                }
-                                                break;
-                                            case MetadataUsageType.FieldInfo:
-                                                if (decodedIndex < metadata.fieldRefs.Length)
-                                                {
-                                                    AddMetadataUsageFieldInfo(json, decodedIndex, va);
-                                                }
-                                                break;
-                                            case MetadataUsageType.StringLiteral:
-                                                //if (decodedIndex < metadata.stringLiterals.Length)
-                                                {
-                                                    AddMetadataUsageStringLiteral(json, decodedIndex, va);
-                                                }
-                                                break;
-                                            case MetadataUsageType.MethodRef:
-                                                if (decodedIndex < il2Cpp.AllGenericMethodSpecs.Length)
-                                                {
-                                                    AddMetadataUsageMethodRef(json, decodedIndex, va);
-                                                }
-                                                break;
-                                        }
-                                        if (il2Cpp.Position != position)
-                                        {
-                                            il2Cpp.Position = position;
-                                        }
-                                    }
+                                    case MetadataUsageType.TypeInfo:
+                                        AddMetadataUsageTypeInfo(json, usage.RawValue, usage.Offset);
+                                        break;
+                                    case MetadataUsageType.Type:
+                                        AddMetadataUsageIl2CppType(json, usage.RawValue, usage.Offset);
+                                        break;
+                                    case MetadataUsageType.MethodDef:
+                                        AddMetadataUsageMethodDef(json, usage.RawValue, usage.Offset);
+                                        break;
+                                    case MetadataUsageType.FieldInfo:
+                                        AddMetadataUsageFieldInfo(json, usage.RawValue, usage.Offset);
+                                        break;
+                                    case MetadataUsageType.StringLiteral:
+                                        AddMetadataUsageStringLiteral(json, usage.RawValue, usage.Offset);
+                                        break;
+                                    case MetadataUsageType.MethodRef:
+                                        AddMetadataUsageMethodRef(json, usage.RawValue, usage.Offset);
+                                        break;
                                 }
                             }
                         }
